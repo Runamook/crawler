@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 import requests
 from selenium import webdriver
 import re
+import csv
 import logging
 from selenium.webdriver.firefox.options import Options
 
@@ -63,6 +64,11 @@ def find_table_by_name(table_name, soup):
     
 def normalizer(string):
     return string.replace('\n', ' ').replace('\xa0', ' ').replace('(рек.)','').strip()
+
+def get_next_tag(tag):
+    letter, digit = tag[:1], tag[1:]         # 'A', '7'
+    new_tag = chr(ord(letter) + 1) + digit
+    return new_tag
 # Helper END
 
 # Step two START
@@ -126,18 +132,27 @@ def extract_company_data_by_text(soup, company, tables):
             
             if xml_table == None:                       # Таблица не найдена
                 continue
-            
-            key_text = item                           # EBITDA, тыс. руб.
-            
-            #lprint(company['name'], key_text)
+                        
+            #print(company['name'], key_text)
             try:
-                company_property_value = xml_table.find('td', string=key_text).next_sibling.next_sibling.get_text()
-            except AttributeError:
+                found_elem_tag = xml_table.find('td', string=item)['data-id']    # 'A7'
+                next_tag = get_next_tag(found_elem_tag)
+                company_property_value = soup.find('td', { 'data-id' : next_tag }).get_text()
+                company_property_value = normalizer(company_property_value)
+                
+            except TypeError:
                 company_property_value = ''
-
-            company_property_key = key_text
-            company_property_value = normalizer(company_property_value)
+                
+            company_property_key = item
             company[company_property_key] = company_property_value
+
+            '''
+            if 'EV/EBITDA' in item or 'DA по прогноз' in item:
+                print(item, found_elem_tag, next_tag, company_property_value)
+                print(xml_table.find('td', string=item))
+                print(soup.find('td', { 'data-id' : next_tag }))
+                print(xml_table)
+            '''
 
     return company
 
@@ -173,56 +188,58 @@ def enrich_all_data(data, url_base):
                      ('B8', 'C8')])
     ]
         
+    '''
     tables_dividend_page = [
             ('дивиденды', [('A3', 'F3'),
                            ('A4', 'F4'),
-                           ('A5', 'F5'),
-                           ('A6', 'F6')]),
+                           ('A5', 'F5')]),
     ('дивидендная доходность', [('A3', 'E3'),
                                 ('A4', 'E4'),
-                                ('A5', 'E5'),
-                                ('A6', 'E6')])
+                                ('A5', 'E5')])
     ]
+    '''
+    general_info = [
+            ('общая информация', ['Отрасль',
+                                  'Вид деятельности',
+                                  'Статус'])
+            ]
+    koefficienti_variant_1 = [
+            ('коэффициенты', ['Текущая цена, руб.',
+                              'Потенциал, %'])
+            ]
+            
+    koefficienti_variant_2 = [
+            ('- потенциал', ['Текущая цена, руб.',
+                             'Потенциал, %'])
+            ]
 
-    tables_multiplicators_page = [
-            ('Рыночные коэффициенты', [('A2', 'B2'),
-                                       ('A3', 'B3'),
-                                       ('A4', 'B4'),
-                                       ('A5', 'B5'),
-                                       ('A7', 'B7'),
-                                       ('A8', 'B8'),
-                                       ('A9', 'B9'),
-                                       ('A11', 'B11'),
-                                       ('A12', 'B12'),
-                                       ('A13', 'B13'),
-                                       ('A14', 'B14'),
-                                       ('A15', 'B15'),
-                                       ('A16', 'B16'),
-                                       ('A17', 'B17'),
-                                       ('A18', 'B18'),
-                                       ('A19', 'B19'),
-                                       ('A20', 'B20'),])
-    ]
-
+    kotirovki = [('котировки', [('A4', 'E4'),('F1', 'F2')])]
+            
+    akcii = [('акции',[('G1', 'G2')])]
+    
+    tables_from_main_page_by_tag = [kotirovki, akcii]
+    
+    tables_from_main_page_by_text = [general_info, koefficienti_variant_1, koefficienti_variant_2]
+    
     tables_multiplicators_text_page = [
             ('Рыночные коэффициенты', ['EBITDA, тыс. руб.',
                                        'EBITDA (прогноз), тыс. руб.',
                                        'Book Value, тыс. руб.',
                                        'EV, тыс. руб.',
                                        'EV/EBITDA',
-                                       'EV/EBITDA по прогнозным показателям',
+                                       'EV/EBITDA по прогнозным\nпоказателям',
                                        'Чистый долг/EBITDA',
                                        'Прибыль на акцию, руб',
                                        'P/E',
-                                       'P/E по прогнозным показателям',
+                                       'P/E по прогнозным\nпоказателям',
                                        'PEG',
                                        'P/S',
-                                       'P/S по прогнозным показателям',
+                                       'P/S по прогнозным\nпоказателям',
                                        'P/BV',
                                        'EV/S',
-                                       'EV/S по прогнозным показателям',
+                                       'EV/S по прогнозным\nпоказателям',
                                        'Дивидендная доходность (АОИ), %',
-                                       'Дивидендная доходность (АОИ), %'
+                                       'Дивидендная доходность (АПИ), %'
                                        ])
     ]
 
@@ -233,16 +250,22 @@ def enrich_all_data(data, url_base):
         soup = BeautifulSoup(selenium_get_html(url), 'lxml')
         
         # First enrich with data from main company page
-        company = extract_company_data(soup, company, tables_from_main_page)
+        for table in tables_from_main_page_by_tag:
+            company = extract_company_data(soup, company, table)
+            
+        for table in tables_from_main_page_by_text:
+            company = extract_company_data_by_text(soup, company, table)
         
         # On the main company page Find URLs to interesting data
         extra_pages = get_extra_pages(soup, url_base)
         
         for page in extra_pages.keys():
+            #try:
             soup = BeautifulSoup(selenium_get_html(extra_pages[page]), 'lxml')
             if page == 'Дивиденды':
-                company = extract_company_data(soup, company, tables_dividend_page)
-            elif page == 'Рыночные коэффициенты':
+                pass
+                #company = extract_company_data(soup, company, tables_dividend_page)
+            elif page == 'Рыночные коэффициенты' and extra_pages[page] != '':
                 company = extract_company_data_by_text(soup, company, tables_multiplicators_text_page)
         
     return data
@@ -272,6 +295,16 @@ def get_extra_pages(soup, url_base):
             
     return extra_pages
 # Step three END
+    
+def write_company_data_to_csv(companies):
+	with open('results_copmanies.csv', 'w') as csvfile:
+		fieldnames = companies[0].keys()
+		writer = csv.DictWriter(csvfile, extrasaction='ignore', fieldnames=fieldnames)
+		writer.writeheader()
+		for company in companies:
+			writer.writerow(company)
+				 
+
 
 def find_all_data():
     
@@ -289,10 +322,13 @@ def find_all_data():
     companies = extract_all_data(url_search, url_base, limit)
     companies = enrich_all_data(companies, url_base)
     
+    write_company_data_to_csv(companies)
+    print(companies)
+    '''
     for company in companies:
         for key in company.keys():
             print(key, company[key], sep='\t\t')
             
         print('\n')     
-            
+    '''      
 find_all_data()
