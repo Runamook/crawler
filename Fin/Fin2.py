@@ -260,12 +260,14 @@ def enrich_all_data(data, url_base):
         extra_pages = get_extra_pages(soup, url_base)
         
         for page in extra_pages.keys():
-            #try:
-            soup = BeautifulSoup(selenium_get_html(extra_pages[page]), 'lxml')
-            if page == 'Дивиденды':
-                pass
-                #company = extract_company_data(soup, company, tables_dividend_page)
-            elif page == 'Рыночные коэффициенты' and extra_pages[page] != '':
+            url = extra_pages[page]
+            
+            if url != '':
+            
+                soup = BeautifulSoup(selenium_get_html(extra_pages[page]), 'lxml')
+                #if page == 'Дивиденды':
+                #    pass
+                #elif page == 'Рыночные коэффициенты':
                 company = extract_company_data_by_text(soup, company, tables_multiplicators_text_page)
         
     return data
