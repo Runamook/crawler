@@ -43,10 +43,16 @@ def extract_all_companies(soup, url_base=None, limit=None):
     for company_data in table.find_all('a', limit=limit):        #<a href="/emitent/unipro">Публичное акционерное общество «Юнипро», ПАО «Юнипро» , UPRO</a>
         company = {}
         company['link'] = url_base + normalizer(company_data['href'])
-        string = normalizer(company_data.get_text()).split(',')
-        company['name'] = string[1]
-        company['ticker'] = string[2]
-
+        string = company_data.get_text()
+        company['name'] = normalizer(re.findall('«(.*?)»', string)[0])           # Non-greedy regex
+        
+        # Below regex works as following:
+        # - ?<=\W - matches followwing characters if preceded by \W (word boundary)
+        # - [A-Z]{4} - matches [A-Z] four times
+        # - ?![A-Z] - matches preceding characters only if not followed by [A-Z]
+        company['ticker'] = normalizer(re.findall('(?<=\W)[A-Z]{4}(?![A-Z])', string)[0])
+        
+        assert len(company['name']) > 3, '\n\n Strange name\n\n%s' % string
         companies.append(company)
         
     return companies
@@ -127,8 +133,8 @@ def extract_company_data_by_text(soup, company, tables):
     '''
     for table in tables:
         table_name = table[0]                           # 'общая информация'
+        xml_table = find_table_by_name(table_name, soup)
         for item in table[1]:                           # 'EBITDA, тыс. руб.'
-            xml_table = find_table_by_name(table_name, soup)
             
             if xml_table == None:                       # Таблица не найдена
                 continue
@@ -137,7 +143,7 @@ def extract_company_data_by_text(soup, company, tables):
             try:
                 found_elem_tag = xml_table.find('td', string=item)['data-id']    # 'A7'
                 next_tag = get_next_tag(found_elem_tag)
-                company_property_value = soup.find('td', { 'data-id' : next_tag }).get_text()
+                company_property_value = xml_table.find('td', { 'data-id' : next_tag }).get_text()
                 company_property_value = normalizer(company_property_value)
                 
             except TypeError:
@@ -147,8 +153,8 @@ def extract_company_data_by_text(soup, company, tables):
             company[company_property_key] = company_property_value
 
             '''
-            if 'EV/EBITDA' in item or 'DA по прогноз' in item:
-                print(item, found_elem_tag, next_tag, company_property_value)
+            if 'Текущая цена' in item:
+                print(table_name, item, found_elem_tag, next_tag, company_property_value)
                 print(xml_table.find('td', string=item))
                 print(soup.find('td', { 'data-id' : next_tag }))
                 print(xml_table)
@@ -173,31 +179,8 @@ def enrich_all_data(data, url_base):
     
     # Here goes series of tables each with:
     # - A part of table name (HTML element will be found by)
-    # - A list of HTML tag values (key value) to grab
+    # - A list of HTML text values to find elements
 
-    tables_from_main_page = [
-            ('общая информация', [('A7', 'B7'),
-                                  ('A8', 'B8'), 
-                                  ('A9','B9')]),
-    ('котировки', [('A4', 'E4'),
-                   ('F1', 'F2')]),
-    ('акции',[('G1', 'G2')]),
-    ('коэффициенты',[('A2', 'C2'),
-                     ('A3', 'C3'),
-                     ('A4', 'C4'),
-                     ('B8', 'C8')])
-    ]
-        
-    '''
-    tables_dividend_page = [
-            ('дивиденды', [('A3', 'F3'),
-                           ('A4', 'F4'),
-                           ('A5', 'F5')]),
-    ('дивидендная доходность', [('A3', 'E3'),
-                                ('A4', 'E4'),
-                                ('A5', 'E5')])
-    ]
-    '''
     general_info = [
             ('общая информация', ['Отрасль',
                                   'Вид деятельности',
@@ -311,15 +294,15 @@ def write_company_data_to_csv(companies):
 def find_all_data():
     
     logging.basicConfig(level=logging.INFO)
-    limit = 15
+    limit = 10
     url_base = 'https://www.conomy.ru'
     url_search = 'https://www.conomy.ru/search'
     
-    companies = [{'link': 'https://www.conomy.ru/emitent/uralkalij', 
-                  'name': ' ПАО «Уралкалий»', 'ticker': ' URKA'},
-            {'link': 'https://www.conomy.ru/emitent/uralkuz',
-             'name': ' ПАО «Уралкуз» ', 'ticker': ' URKZ'}
+    '''
+    companies = [{'link': 'https://www.conomy.ru/emitent/astana', 
+                  'name': '«Банк Астаны»', 'ticker': 'ABBN'},
             ]
+    '''
     
     companies = extract_all_data(url_search, url_base, limit)
     companies = enrich_all_data(companies, url_base)
