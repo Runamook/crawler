@@ -7,11 +7,8 @@ Created on Sat Jun  2 01:43:47 2018
 """
 
 from bs4 import BeautifulSoup
-import requests
 from selenium import webdriver
-import re
-import csv
-import logging
+import logging, time, csv, re, requests
 from selenium.webdriver.firefox.options import Options
 
 
@@ -38,8 +35,8 @@ def extract_all_data(url, url_base=None, limit=None):
 def extract_all_companies(soup, url_base=None, limit=None):
     companies = []
     
-    logging.info('Started "extract_all_companies" function')
     table = soup.find(class_='search-results')      #<div class="search-results">
+    time_start = time.time()
     
     for company_data in table.find_all('a', limit=limit):        #<a href="/emitent/unipro">Публичное акционерное общество «Юнипро», ПАО «Юнипро» , UPRO</a>
         company = {}
@@ -52,8 +49,8 @@ def extract_all_companies(soup, url_base=None, limit=None):
         assert len(company['name']) > 2, '\n\n Strange name\n\n%s' % string
         companies.append(company)
         
-    
-    logging.info('Finished "extract_all_companies" function, found %s companies', len(companies))
+    time_spent = round(time.time() - time_start, 2)
+    logging.info('Found %s companies in %s seconds', len(companies), time_spent)
     
     return companies
 # Step one END
@@ -67,7 +64,7 @@ def find_company_ticker(string):
     try:
         result = normalizer(re.findall('(?<=\W)[A-Z]{4}(?![A-Z])', string)[0])
     except:
-        print('\n\nTicker exception\t' + string  + '\n\n')
+        logging.warning('Ticker exception for %s', string)
         result = normalizer(string.split(',')[-1])
     return result       
         
@@ -77,7 +74,7 @@ def find_company_name(string):
         result = normalizer(re.findall('«(.*?)»', string)[0])
     except IndexError:
         result = normalizer(string.split(',')[1])
-        print('\n\nCompany name exception\t' + string  + '\nSelected name ' + result)
+        logging.warning('Company name exception %s selected name %s', string, result)
     return result
 
 def find_table_by_name(table_name, soup):
@@ -114,8 +111,7 @@ def selenium_get_html(url):
     Returns HTML docment (string)
     
     '''
-    logging.info('Started selenium on url %s', url)
-
+    time_start = time.time()
     assert 'http' in url, '\n\nNo HTTP URL provided\nURL:\t%s' % url
     options = Options()
     options.set_headless(headless=True)    
@@ -124,7 +120,8 @@ def selenium_get_html(url):
 
     html = driver.page_source
     driver.close()
-    logging.info('Finished selenium')
+    time_spent = round(time.time() - time_start, 2)
+    logging.debug('%s processed in %s seconds', url, time_spent)
     return html
 
 def extract_company_data(soup, company, tables):
@@ -147,8 +144,10 @@ def extract_company_data(soup, company, tables):
             value_tag = item[1]
             
             #print(item, key_tag, value_tag)
-            company_property_key = xml_table.find('td', {'data-id' : key_tag}).get_text() # Отрасль
-            company_property_value = xml_table.find('td', {'data-id' : value_tag}).get_text() # Чёрная металлургия
+            company_property_key = xml_table.find('td', 
+                                                  {'data-id' : key_tag}).get_text() # Отрасль
+            company_property_value = xml_table.find('td', 
+                                                    {'data-id' : value_tag}).get_text() # Чёрная металлургия
 
             company_property_value = normalizer(company_property_value)
             company_property_key = normalizer(company_property_key)
@@ -176,7 +175,8 @@ def extract_company_data_by_text(soup, company, tables):
             try:
                 found_elem_tag = xml_table.find('td', string=item)['data-id']    # 'A7'
                 next_tag = get_next_tag(found_elem_tag)
-                company_property_value = xml_table.find('td', { 'data-id' : next_tag }).get_text()
+                company_property_value = xml_table.find('td',
+                                                        { 'data-id' : next_tag }).get_text()
                 company_property_value = normalizer(company_property_value)
                 
             except TypeError:
@@ -260,10 +260,10 @@ def enrich_all_data(data, url_base):
     ]
 
     for company in data:
-        print(company['ticker'])
+        logging.debug('Ticker:\t%s', company['ticker'])
+        time_start = time.time()
         url = company['link']
         
-        #logging.debug(company, url)
         soup = BeautifulSoup(selenium_get_html(url), 'lxml')
         
         # First enrich with data from main company page
@@ -282,11 +282,11 @@ def enrich_all_data(data, url_base):
             if url != '':
             
                 soup = BeautifulSoup(selenium_get_html(extra_pages[page]), 'lxml')
-                #if page == 'Дивиденды':
-                #    pass
-                #elif page == 'Рыночные коэффициенты':
                 company = extract_company_data_by_text(soup, company, tables_multiplicators_text_page)
-        
+        time_spent = round(time.time() - time_start, 2)
+
+        logging.info('[%s of %s] %s processed in %s seconds',
+                     data.index(company)+1, len(data), company['name'], time_spent)
     return data
         
 # Step two END  
@@ -300,10 +300,12 @@ def get_extra_pages(soup, url_base):
     {'Дивиденды': 'https://www.conomy.ru/emitent/uralkalij/urka-div', 
     'Рыночные коэффициенты': 'https://www.conomy.ru/emitent/uralkalij/urka-rk'}
     
-    '''
+    
     extra_pages = { 'Дивиденды' : '', 
                      'Рыночные коэффициенты' : ''
                      }
+    '''
+    extra_pages = { 'Рыночные коэффициенты' : '' }
     for page in extra_pages.keys():
         try:
             url = url_base + soup.find('span', string=page).parent['href']
@@ -318,17 +320,21 @@ def get_extra_pages(soup, url_base):
 def write_company_data_to_csv(companies):
 	with open('results_copmanies.csv', 'w') as csvfile:
 		fieldnames = companies[0].keys()
-		writer = csv.DictWriter(csvfile, extrasaction='ignore', fieldnames=fieldnames)
+		writer = csv.DictWriter(csvfile, extrasaction='ignore', 
+                          fieldnames=fieldnames)
 		writer.writeheader()
 		for company in companies:
 			writer.writerow(company)
-				 
-
+    
 
 def find_all_data():
+    time_start = time.time()
+    logging.basicConfig(
+            format='%(asctime)s %(levelname)-8s %(message)s',
+            level=logging.INFO,
+            datefmt='%H:%M:%S')
     
-    logging.basicConfig(level=logging.INFO)
-    limit = 10
+    limit = 30
     ticker_letters = ['T', 'R', 'N']
     url_base = 'https://www.conomy.ru'
     url_search = 'https://www.conomy.ru/search'
@@ -340,18 +346,12 @@ def find_all_data():
     '''
     
     companies = extract_all_data(url_search, url_base, limit)
-    
     filter_companies_by_ticker(companies, ticker_letters)
-    
     companies = enrich_all_data(companies, url_base)
+    time_spent = round(time.time() - time_start, 2)
+    logging.info('Finished processing of %s companies in %s seconds',
+                 len(companies), time_spent)
     
     write_company_data_to_csv(companies)
-    print(companies)
-    '''
-    for company in companies:
-        for key in company.keys():
-            print(key, company[key], sep='\t\t')
-            
-        print('\n')     
-    '''      
+
 find_all_data()
