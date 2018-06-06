@@ -42,23 +42,40 @@ def extract_all_companies(soup, url_base=None, limit=None):
     
     for company_data in table.find_all('a', limit=limit):        #<a href="/emitent/unipro">Публичное акционерное общество «Юнипро», ПАО «Юнипро» , UPRO</a>
         company = {}
+
         company['link'] = url_base + normalizer(company_data['href'])
         string = company_data.get_text()
-        company['name'] = normalizer(re.findall('«(.*?)»', string)[0])           # Non-greedy regex
+        company['name'] = find_company_name(string)
+        company['ticker'] = find_company_ticker(string)
         
-        # Below regex works as following:
-        # - ?<=\W - matches followwing characters if preceded by \W (word boundary)
-        # - [A-Z]{4} - matches [A-Z] four times
-        # - ?![A-Z] - matches preceding characters only if not followed by [A-Z]
-        company['ticker'] = normalizer(re.findall('(?<=\W)[A-Z]{4}(?![A-Z])', string)[0])
-        
-        assert len(company['name']) > 3, '\n\n Strange name\n\n%s' % string
+        assert len(company['name']) > 2, '\n\n Strange name\n\n%s' % string
         companies.append(company)
         
     return companies
 # Step one END
 
 # Helper STAR
+def find_company_ticker(string):
+    # Below regex works as following:
+    # - ?<=\W - matches followwing characters if preceded by \W (word boundary)
+    # - [A-Z]{4} - matches [A-Z] four times
+    # - ?![A-Z] - matches preceding characters only if not followed by [A-Z]
+    try:
+        result = normalizer(re.findall('(?<=\W)[A-Z]{4}(?![A-Z])', string)[0])
+    except:
+        print('\n\nTicker exception\t' + string  + '\n\n')
+        result = normalizer(string.split(',')[-1])
+    return result       
+        
+def find_company_name(string):
+    # Non-greedy regex .*? matches first match from the beginning
+    try:
+        result = normalizer(re.findall('«(.*?)»', string)[0])
+    except IndexError:
+        result = normalizer(string.split(',')[1])
+        print('\n\nCompany name exception\t' + string  + '\nSelected name ' + result)
+    return result
+
 def find_table_by_name(table_name, soup):
     table = soup.find_all('table', {'data-name' : re.compile(table_name)})
     assert len(table) <= 1, '\n\nUnique table not found\nTables found:\t%s\nTable name:\t%s' % (len(table), table_name)
@@ -75,6 +92,15 @@ def get_next_tag(tag):
     letter, digit = tag[:1], tag[1:]         # 'A', '7'
     new_tag = chr(ord(letter) + 1) + digit
     return new_tag
+
+def filter_companies_by_ticker(companies, letters):
+    result = []
+    for company in companies:
+        pattern_length = len(letters[0])
+        if company['ticker'][:pattern_length] in letters:
+            result.append(company)
+    return result
+    
 # Helper END
 
 # Step two START
@@ -227,6 +253,7 @@ def enrich_all_data(data, url_base):
     ]
 
     for company in data:
+        print(company['ticker'])
         url = company['link']
         
         #logging.debug(company, url)
@@ -295,6 +322,7 @@ def find_all_data():
     
     logging.basicConfig(level=logging.INFO)
     limit = 10
+    ticker_letters = ['T', 'R', 'N']
     url_base = 'https://www.conomy.ru'
     url_search = 'https://www.conomy.ru/search'
     
@@ -305,6 +333,9 @@ def find_all_data():
     '''
     
     companies = extract_all_data(url_search, url_base, limit)
+    
+    filter_companies_by_ticker(companies, ticker_letters)
+    
     companies = enrich_all_data(companies, url_base)
     
     write_company_data_to_csv(companies)
