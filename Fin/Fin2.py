@@ -38,6 +38,7 @@ def extract_all_data(url, url_base=None, limit=None):
 def extract_all_companies(soup, url_base=None, limit=None):
     companies = []
     
+    logging.info('Started "extract_all_companies" function')
     table = soup.find(class_='search-results')      #<div class="search-results">
     
     for company_data in table.find_all('a', limit=limit):        #<a href="/emitent/unipro">Публичное акционерное общество «Юнипро», ПАО «Юнипро» , UPRO</a>
@@ -51,6 +52,9 @@ def extract_all_companies(soup, url_base=None, limit=None):
         assert len(company['name']) > 2, '\n\n Strange name\n\n%s' % string
         companies.append(company)
         
+    
+    logging.info('Finished "extract_all_companies" function, found %s companies', len(companies))
+    
     return companies
 # Step one END
 
@@ -110,6 +114,8 @@ def selenium_get_html(url):
     Returns HTML docment (string)
     
     '''
+    logging.info('Started selenium on url %s', url)
+
     assert 'http' in url, '\n\nNo HTTP URL provided\nURL:\t%s' % url
     options = Options()
     options.set_headless(headless=True)    
@@ -118,6 +124,7 @@ def selenium_get_html(url):
 
     html = driver.page_source
     driver.close()
+    logging.info('Finished selenium')
     return html
 
 def extract_company_data(soup, company, tables):
