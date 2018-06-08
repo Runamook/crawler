@@ -173,7 +173,6 @@ def extract_company_data_by_text(soup, company, tables):
             if xml_table == None:                       # Таблица не найдена
                 continue
                         
-            print(item)
             try:
                 found_elem_tag = xml_table.find('td', string=item)['data-id']    # 'A7'
                 next_tag = get_next_tag(found_elem_tag)
@@ -321,6 +320,7 @@ def get_extra_pages(soup, url_base):
 # Step three END
     
 def write_company_data_to_csv(companies):
+    # Something WRON in CSV writer
     
     header = [
             'link',
@@ -354,9 +354,8 @@ def write_company_data_to_csv(companies):
             'Дивидендная доходность (АПИ), %'
             ]
     with open('results_copmanies.csv', 'w') as csvfile:
-        fieldnames = companies[0].keys()
         writer = csv.DictWriter(csvfile, extrasaction='ignore', 
-                          fieldnames=fieldnames)
+                          fieldnames=header)
         writer.writeheader()
         for company in companies:
             writer.writerow(company)
@@ -387,8 +386,7 @@ def find_all_data():
     time_spent = round(time.time() - time_start, 2)
     logging.info('Finished processing of %s companies in %s seconds',
                  len(companies), time_spent)
-    
-    print(companies)
+
     write_company_data_to_csv(companies)
 
 find_all_data()
