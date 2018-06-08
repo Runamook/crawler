@@ -333,8 +333,8 @@ def write_company_data_to_csv(companies):
             'Статус', 
             'Текущая цена, руб.',
             'Потенциал, %', 
-            'EBITDA, тыс. руб.'
-            'EBITDA (прогноз), тыс. руб.'
+            'EBITDA, тыс. руб.',
+            'EBITDA (прогноз), тыс. руб.',
             'Book Value, тыс. руб.', 
             'EV, тыс. руб.', 
             'EV/EBITDA',
@@ -367,7 +367,7 @@ def find_all_data():
             level=logging.INFO,
             datefmt='%H:%M:%S')
     
-    limit = 300
+    limit = 50
     ticker_letters = ['N','T','S','M']
     url_base = 'https://www.conomy.ru'
     url_search = 'https://www.conomy.ru/search'
