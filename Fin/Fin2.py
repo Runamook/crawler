@@ -64,8 +64,8 @@ def find_company_ticker(string):
     try:
         result = normalizer(re.findall('(?<=\W)[A-Z]{4}(?![A-Z])', string)[0])
     except:
-        logging.warning('Ticker exception for %s', string)
         result = normalizer(string.split(',')[-1])
+        logging.warning('Ticker exception for %s, selected %s', string, result)
     return result       
         
 def find_company_name(string):
@@ -367,19 +367,19 @@ def find_all_data():
             level=logging.INFO,
             datefmt='%H:%M:%S')
     
-    limit = 150
-    ticker_letters = ['NAUK']
+    limit = 300
+    ticker_letters = ['N','T','S','M']
     url_base = 'https://www.conomy.ru'
     url_search = 'https://www.conomy.ru/search'
     
-
+    '''
     companies = [{'link': 'https://www.conomy.ru/emitent/nauka', 
                   'name': '«Наука»', 'ticker': 'NAUK'},
             ]
+    '''
     
-    
-    #companies = extract_all_data(url_search, url_base, limit)
-    #companies = filter_companies_by_ticker(companies, ticker_letters)
+    companies = extract_all_data(url_search, url_base, limit)
+    companies = filter_companies_by_ticker(companies, ticker_letters)
     companies = enrich_all_data(companies, url_base)
     time.sleep(1)
     time_spent = round(time.time() - time_start, 2)
