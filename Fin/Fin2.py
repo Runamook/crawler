@@ -181,7 +181,7 @@ def extract_company_data_by_text(soup, company, tables):
                 company_property_value = normalizer(company_property_value)
                 
             except TypeError:
-                company_property_value = ''
+                company_property_value = '-'
                 
             company_property_key = item
             company[company_property_key] = company_property_value
@@ -320,7 +320,6 @@ def get_extra_pages(soup, url_base):
 # Step three END
     
 def write_company_data_to_csv(companies):
-    # Something WRON in CSV writer
     
     header = [
             'link',
@@ -355,7 +354,7 @@ def write_company_data_to_csv(companies):
             ]
     with open('results_copmanies.csv', 'w') as csvfile:
         writer = csv.DictWriter(csvfile, extrasaction='ignore', 
-                          fieldnames=header)
+                          fieldnames=header, restval='-')
         writer.writeheader()
         for company in companies:
             writer.writerow(company)
