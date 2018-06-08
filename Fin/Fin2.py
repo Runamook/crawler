@@ -35,7 +35,7 @@ def extract_all_data(url, url_base=None, limit=None):
 def extract_all_companies(soup, url_base=None, limit=None):
     companies = []
     
-    table = soup.find(class_='search-results')      #<div class="search-results">
+    table = soup.find(class_='search-results')                   #<div class="search-results">
     time_start = time.time()
     
     for company_data in table.find_all('a', limit=limit):        #<a href="/emitent/unipro">Публичное акционерное общество «Юнипро», ПАО «Юнипро» , UPRO</a>
@@ -100,6 +100,8 @@ def filter_companies_by_ticker(companies, letters):
         pattern_length = len(letters[0])
         if company['ticker'][:pattern_length] in letters:
             result.append(company)
+    
+    assert len(result) > 0, 'No companies found for filter %s' % letters
     return result
     
 # Helper END
@@ -171,7 +173,7 @@ def extract_company_data_by_text(soup, company, tables):
             if xml_table == None:                       # Таблица не найдена
                 continue
                         
-            #print(company['name'], key_text)
+            print(item)
             try:
                 found_elem_tag = xml_table.find('td', string=item)['data-id']    # 'A7'
                 next_tag = get_next_tag(found_elem_tag)
@@ -184,7 +186,8 @@ def extract_company_data_by_text(soup, company, tables):
                 
             company_property_key = item
             company[company_property_key] = company_property_value
-
+            
+            #print(company_property_key, company_property_value)
             '''
             if 'Текущая цена' in item:
                 print(table_name, item, found_elem_tag, next_tag, company_property_value)
@@ -318,13 +321,45 @@ def get_extra_pages(soup, url_base):
 # Step three END
     
 def write_company_data_to_csv(companies):
-	with open('results_copmanies.csv', 'w') as csvfile:
-		fieldnames = companies[0].keys()
-		writer = csv.DictWriter(csvfile, extrasaction='ignore', 
+    
+    header = [
+            'link',
+            'name',
+            'ticker',
+            'Рыночная капитализация, тыс. руб.',
+            'Объем торгов, руб.',
+            'Уровень листинга', 
+            'Отрасль', 
+            'Вид деятельности', 
+            'Статус', 
+            'Текущая цена, руб.',
+            'Потенциал, %', 
+            'EBITDA, тыс. руб.'
+            'EBITDA (прогноз), тыс. руб.'
+            'Book Value, тыс. руб.', 
+            'EV, тыс. руб.', 
+            'EV/EBITDA',
+            'EBITDA по прогнозным\nпоказателям', 
+            'Чистый долг/EBITDA', 
+            'Прибыль на акцию, руб', 
+            'P/E', 
+            'P/E по прогнозным\nпоказателям', 
+            'PEG',
+            'P/S',
+            'P/S по прогнозным\nпоказателям',
+            'P/BV',
+            'EV/S',
+            'EV/S по прогнозным\nпоказателям',
+            'Дивидендная доходность (АОИ), %',
+            'Дивидендная доходность (АПИ), %'
+            ]
+    with open('results_copmanies.csv', 'w') as csvfile:
+        fieldnames = companies[0].keys()
+        writer = csv.DictWriter(csvfile, extrasaction='ignore', 
                           fieldnames=fieldnames)
-		writer.writeheader()
-		for company in companies:
-			writer.writerow(company)
+        writer.writeheader()
+        for company in companies:
+            writer.writerow(company)
     
 
 def find_all_data():
@@ -334,24 +369,26 @@ def find_all_data():
             level=logging.INFO,
             datefmt='%H:%M:%S')
     
-    limit = 30
-    ticker_letters = ['T', 'R', 'N']
+    limit = 150
+    ticker_letters = ['NAUK']
     url_base = 'https://www.conomy.ru'
     url_search = 'https://www.conomy.ru/search'
     
-    '''
-    companies = [{'link': 'https://www.conomy.ru/emitent/astana', 
-                  'name': '«Банк Астаны»', 'ticker': 'ABBN'},
+
+    companies = [{'link': 'https://www.conomy.ru/emitent/nauka', 
+                  'name': '«Наука»', 'ticker': 'NAUK'},
             ]
-    '''
     
-    companies = extract_all_data(url_search, url_base, limit)
-    filter_companies_by_ticker(companies, ticker_letters)
+    
+    #companies = extract_all_data(url_search, url_base, limit)
+    #companies = filter_companies_by_ticker(companies, ticker_letters)
     companies = enrich_all_data(companies, url_base)
+    time.sleep(1)
     time_spent = round(time.time() - time_start, 2)
     logging.info('Finished processing of %s companies in %s seconds',
                  len(companies), time_spent)
     
+    print(companies)
     write_company_data_to_csv(companies)
 
 find_all_data()
