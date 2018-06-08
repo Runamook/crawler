@@ -379,9 +379,8 @@ def find_all_data():
     '''
     
     companies = extract_all_data(url_search, url_base, limit)
-    companies = filter_companies_by_ticker(companies, ticker_letters)
+    #companies = filter_companies_by_ticker(companies, ticker_letters)
     companies = enrich_all_data(companies, url_base)
-    time.sleep(1)
     time_spent = round(time.time() - time_start, 2)
     logging.info('Finished processing of %s companies in %s seconds',
                  len(companies), time_spent)
