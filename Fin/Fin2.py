@@ -104,6 +104,34 @@ def filter_companies_by_ticker(companies, letters):
     assert len(result) > 0, 'No companies found for filter %s' % letters
     return result
     
+def check_if_alpha(word):
+    if word == '':
+        return True
+    if word == '-':
+        return True
+    for letter in word:
+        if letter.isalpha():
+            return True
+    return False
+    
+def normalize_number(number):
+    number = number.replace(' ', '')
+    
+    return number
+    
+def result_normalizer(company):
+    normalized_company = {}
+    
+    for key in company.keys():
+        value = company[key]
+        key = key.replace('\n', ' ')
+        
+        if not check_if_alpha(value):
+            value = normalize_number(value)
+            
+        normalized_company[key] = value
+    
+    return normalized_company
 # Helper END
 
 # Step two START
@@ -322,7 +350,6 @@ def get_extra_pages(soup, url_base):
 def write_company_data_to_csv(companies):
     
     header = [
-            'link',
             'name',
             'ticker',
             'Рыночная капитализация, тыс. руб.',
@@ -357,8 +384,9 @@ def write_company_data_to_csv(companies):
                           fieldnames=header, restval='-')
         writer.writeheader()
         for company in companies:
+            company = result_normalizer(company)
+            #print(company)
             writer.writerow(company)
-    
 
 def find_all_data():
     time_start = time.time()
@@ -367,7 +395,7 @@ def find_all_data():
             level=logging.INFO,
             datefmt='%H:%M:%S')
     
-    limit = 300
+    limit = 30
     ticker_letters = ['N','T','S','M']
     url_base = 'https://www.conomy.ru'
     url_search = 'https://www.conomy.ru/search'
