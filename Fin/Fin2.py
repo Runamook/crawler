@@ -367,7 +367,7 @@ def find_all_data():
             level=logging.INFO,
             datefmt='%H:%M:%S')
     
-    limit = 50
+    limit = 300
     ticker_letters = ['N','T','S','M']
     url_base = 'https://www.conomy.ru'
     url_search = 'https://www.conomy.ru/search'
